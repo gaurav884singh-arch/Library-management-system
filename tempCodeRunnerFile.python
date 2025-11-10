@@ -1,0 +1,174 @@
+import mysql.connector
+from mysql.connector import Error
+from tkinter import *
+from tkinter import ttk, messagebox
+
+# ------------------ DATABASE CONNECTION ------------------
+def connect_db():
+    try:
+        db = mysql.connector.connect(
+            host="localhost",
+            user="ayush",          # <-- your MySQL username
+            password="ayush123",   # <-- your MySQL password
+            database="ayushdb"     # <-- your database
+        )
+        return db
+    except Error as err:
+        messagebox.showerror("Database Error", f"Error: {err}")
+        return None
+
+
+# ------------------ LOGIN WINDOW ------------------
+def login_window():
+    win = Tk()
+    win.title("Library Login")
+    win.geometry("400x300")
+    win.config(bg="#D6F3F9")
+
+    Label(win, text="Username:", font=("Arial", 12), bg="#D6F3F9").place(x=50, y=70)
+    Label(win, text="Password:", font=("Arial", 12), bg="#D6F3F9").place(x=50, y=120)
+
+    user_entry = Entry(win, font=("Arial", 12))
+    user_entry.place(x=150, y=70)
+
+    pass_entry = Entry(win, show="*", font=("Arial", 12))
+    pass_entry.place(x=150, y=120)
+
+    def check_login():
+        username = user_entry.get()
+        password = pass_entry.get()
+        db = connect_db()
+        if db is None:
+            return
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM users WHERE username=%s AND password=%s", (username, password))
+        result = cursor.fetchone()
+        if result:
+            messagebox.showinfo("Login Success", "Welcome to the Library Management System!")
+            win.destroy()
+            main_window()
+        else:
+            messagebox.showerror("Login Failed", "Invalid Username or Password")
+        db.close()
+
+    Button(win, text="Login", font=("Arial", 12, "bold"), bg="#027B7F", fg="white", command=check_login).place(x=170, y=180)
+    win.mainloop()
+
+
+# ------------------ MAIN WINDOW ------------------
+def main_window():
+    root = Tk()
+    root.title("Library Management System")
+    root.geometry("900x600")
+    root.config(bg="#EAF6F6")
+
+    Label(root, text="Library Management System", font=("Arial", 20, "bold"), bg="#EAF6F6", fg="#02475E").pack(pady=20)
+
+    # ---------------- Add Book Section ----------------
+    frame1 = Frame(root, bg="#EAF6F6")
+    frame1.pack(pady=10)
+
+    Label(frame1, text="Book ID:", font=("Arial", 12), bg="#EAF6F6").grid(row=0, column=0, padx=10, pady=5)
+    Label(frame1, text="Title:", font=("Arial", 12), bg="#EAF6F6").grid(row=1, column=0, padx=10, pady=5)
+    Label(frame1, text="Author:", font=("Arial", 12), bg="#EAF6F6").grid(row=2, column=0, padx=10, pady=5)
+    Label(frame1, text="Copies:", font=("Arial", 12), bg="#EAF6F6").grid(row=3, column=0, padx=10, pady=5)
+
+    id_entry = Entry(frame1, font=("Arial", 12))
+    title_entry = Entry(frame1, font=("Arial", 12))
+    author_entry = Entry(frame1, font=("Arial", 12))
+    copies_entry = Entry(frame1, font=("Arial", 12))
+
+    id_entry.grid(row=0, column=1)
+    title_entry.grid(row=1, column=1)
+    author_entry.grid(row=2, column=1)
+    copies_entry.grid(row=3, column=1)
+
+    # ---------------- Functions ----------------
+    def clear_fields():
+        id_entry.delete(0, END)
+        title_entry.delete(0, END)
+        author_entry.delete(0, END)
+        copies_entry.delete(0, END)
+
+    def add_book():
+        db = connect_db()
+        if db is None:
+            return
+        cursor = db.cursor()
+        title = title_entry.get()
+        author = author_entry.get()
+        copies = copies_entry.get()
+
+        if title == "" or author == "" or copies == "":
+            messagebox.showerror("Error", "Please fill all book details")
+        else:
+            cursor.execute("INSERT INTO books (title, author, copies) VALUES (%s, %s, %s)", (title, author, copies))
+            db.commit()
+            messagebox.showinfo("Success", "Book added successfully!")
+            clear_fields()
+            show_books()
+        db.close()
+
+    def show_books():
+        db = connect_db()
+        if db is None:
+            return
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM books")
+        records = cursor.fetchall()
+        for i in book_table.get_children():
+            book_table.delete(i)
+        for row in records:
+            book_table.insert("", END, values=row)
+        db.close()
+
+    def delete_book():
+        book_id = id_entry.get()
+        if book_id == "":
+            messagebox.showerror("Error", "Enter Book ID to delete")
+            return
+        db = connect_db()
+        if db is None:
+            return
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM books WHERE book_id=%s", (book_id,))
+        db.commit()
+        if cursor.rowcount == 0:
+            messagebox.showwarning("Not Found", "No book found with that ID")
+        else:
+            messagebox.showinfo("Deleted", f"Book ID {book_id} deleted successfully")
+        db.close()
+        clear_fields()
+        show_books()
+
+    # ---------------- Buttons ----------------
+    btn_frame = Frame(frame1, bg="#EAF6F6")
+    btn_frame.grid(row=4, column=0, columnspan=2, pady=10)
+
+    Button(btn_frame, text="Add Book", font=("Arial", 12, "bold"), bg="#027B7F", fg="white", width=12, command=add_book).grid(row=0, column=0, padx=5)
+    Button(btn_frame, text="Show Books", font=("Arial", 12, "bold"), bg="#02475E", fg="white", width=12, command=show_books).grid(row=0, column=1, padx=5)
+    Button(btn_frame, text="Delete Book", font=("Arial", 12, "bold"), bg="#A30000", fg="white", width=12, command=delete_book).grid(row=0, column=2, padx=5)
+    Button(btn_frame, text="Clear Fields", font=("Arial", 12, "bold"), bg="#6C757D", fg="white", width=12, command=clear_fields).grid(row=0, column=3, padx=5)
+
+    # ---------------- Book Display Table ----------------
+    frame2 = Frame(root)
+    frame2.pack(pady=20)
+
+    book_table = ttk.Treeview(frame2, columns=("ID", "Title", "Author", "Copies"), show="headings", height=10)
+    book_table.heading("ID", text="ID")
+    book_table.heading("Title", text="Title")
+    book_table.heading("Author", text="Author")
+    book_table.heading("Copies", text="Copies")
+    book_table.column("ID", width=60)
+    book_table.column("Title", width=250)
+    book_table.column("Author", width=200)
+    book_table.column("Copies", width=80)
+    book_table.pack()
+
+    show_books()
+    root.mainloop()
+
+
+# ------------------ MAIN PROGRAM START ------------------
+if __name__ == "__main__":
+    login_window()
